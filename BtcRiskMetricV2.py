@@ -28,7 +28,7 @@ df_sensex = df_sensex[df_sensex['Value'] > 0]
 sensex_data = yf.download(tickers='^BSESN', period='1d', interval='1m')  # Ticker symbol for Sensex is ^BSESN
 
 # Append the latest price data to the dataframe
-df_sensex.loc[df_sensex.index[-1] + 1] = [date.today(), sensex_data['Close'].iloc[-1]]
+df_sensex.loc[df_sensex.index[-1] + 1, ['Date', 'Value']] = [date.today(), sensex_data['Close'].iloc[-1]]
 df_sensex['Date'] = pd.to_datetime(df_sensex['Date'])
 
 # Calculate the `Risk Metric`
