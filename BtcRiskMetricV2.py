@@ -10,7 +10,7 @@ import yfinance as yf
 
 
 # Download historical data from Quandl
-df_sensex = quandl.get('BSE-bombay-stock-exchange/SENSEX', api_key='vKHe3RFS52fCx-4csoxH').reset_index()
+df_sensex = quandl.get('BSE/SENSEX', api_key='vKHe3RFS52fCx-4csoxH').reset_index()
 
 # Rename columns to match Bitcoin code
 df_sensex = df_sensex.rename(columns={'Date': 'Date', 'Close': 'Value'})
