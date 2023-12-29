@@ -27,7 +27,7 @@ df_sensex = df_sensex[df_sensex['Value'] > 0]
 # Get the last price against USD
 # Get the last price against USD
 sensex_data = yf.download(tickers='^BSESN', period='1d', interval='1m')  # Ticker symbol for Sensex is ^BSESN
-df_sensex.loc[df_sensex.index[-1] + 1] = [date.today(), sensex_data['Close'] = sensex_data['Close'].iloc[:, 0]
+df_sensex.loc[df_sensex.index[-1] + 1] = [date.today(), sensex_data['Close'] = sensex_data['Close'].iloc[:, 0]]
 
 # Append the latest price data to the dataframe
 df_sensex.loc[df_sensex.index[-1]+1] = [date.today(), btcdata['Close'].iloc[-1]]
