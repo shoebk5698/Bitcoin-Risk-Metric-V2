@@ -8,52 +8,58 @@ import quandl
 import yfinance as yf
 
 
+
 # Download historical data from Quandl
-df = quandl.get('BCHAIN/MKPRU', api_key='FYzyusVT61Y4w65nFESX').reset_index()
+df = quandl.get('BSE-bombay-stock-exchange/SENSEX', api_key='vKHe3RFS52fCx-4csoxH').reset_index()
+
+# Rename columns to match Bitcoin code
+df_sensex = df_sensex.rename(columns={'Date': 'Date', 'Close': 'Value'})
 
 # Convert dates to datetime object for easy use
-df['Date'] = pd.to_datetime(df['Date'])
+df_sensex['Date'] = pd.to_datetime(df_sensex['Date'])
 
 # Sort data by date, just in case
-df.sort_values(by='Date', inplace=True)
+df_sensex.sort_values(by='Date', inplace=True)
 
 # Only include data points with existing price
-df = df[df['Value'] > 0]
+df_sensex = df_sensex[df_sensex['Value'] > 0]
 
 # Get the last price against USD
-btcdata = yf.download(tickers='BTC-USD', period='1d', interval='1m')
+# Get the last price against USD
+sensex_data = yf.download(tickers='^BSESN', period='1d', interval='1m')  # Ticker symbol for Sensex is ^BSESN
+df_sensex.loc[df_sensex.index[-1] + 1] = [date.today(), sensex_data['Close'].iloc[-1]]
 
 # Append the latest price data to the dataframe
-df.loc[df.index[-1]+1] = [date.today(), btcdata['Close'].iloc[-1]]
-df['Date'] = pd.to_datetime(df['Date'])
+df_sensex.loc[df_sensex.index[-1]+1] = [date.today(), btcdata['Close'].iloc[-1]]
+df_sensex['Date'] = pd.to_datetime(df_sensex['Date'])
 
 # Calculate the `Risk Metric`
-df['MA'] = df['Value'].rolling(374, min_periods=1).mean().dropna()
-df['Preavg'] = (np.log(df.Value) - np.log(df['MA'])) * df.index**.395
+df_sensex['MA'] = df_sensex['Value'].rolling(window=252, min_periods=1).mean().dropna()
+df_sensex['Preavg'] = (np.log(df_sensex['Value']) - np.log(df_sensex['MA'])) * df_sensex.index**.395
 
 # Normalization to 0-1 range
-df['avg'] = (df['Preavg'] - df['Preavg'].cummin()) / (df['Preavg'].cummax() - df['Preavg'].cummin())
+df_sensex['avg'] = (df_sensex['Preavg'] - df_sensex['Preavg'].cummin()) / (df_sensex['Preavg'].cummax() - df_sensex['Preavg'].cummin())
 
 # Predicting the price according to risk level
-price_per_risk = {
-    round(risk, 1):round(np.exp(
-        (risk * (df['Preavg'].cummax().iloc[-1] - (cummin := df['Preavg'].cummin().iloc[-1])) + cummin) / df.index[-1]**.395 + np.log(df['MA'].iloc[-1])
+price_per_risk_sensex = {
+    round(risk, 1): round(np.exp(
+        (risk * (df_sensex['Preavg'].cummax().iloc[-1] - (cummin := df_sensex['Preavg'].cummin().iloc[-1])) + cummin) / df_sensex.index[-1]**.395 + np.log(df_sensex['MA'].iloc[-1])
     ))
     for risk in np.arange(0.0, 1.0, 0.1)
 }
 
 # Exclude the first 1000 days from the dataframe, because it's pure chaos
-df = df[df.index > 1000]
+df_sensex = df_sensex[df_sensex.index > 1000]
 
 # Title for the plots
-AnnotationText = f"Updated: {btcdata.index[-1]} | Price: {round(df['Value'].iloc[-1])} | Risk: {round(df['avg'].iloc[-1], 2)}"
+AnnotationText = f"Updated: {sensex_data.index[-1]} | Price: {round(df_sensex['Value'].iloc[-1])} | Risk: {round(df_sensex['avg'].iloc[-1], 2)}"
 
 # Plot BTC-USD and Risk on a logarithmic chart
 fig = make_subplots(specs=[[{'secondary_y': True}]])
 
 # Add BTC-USD and Risk data to the figure
-fig.add_trace(go.Scatter(x=df['Date'], y=df['Value'], name='Price', line=dict(color='gold')))
-fig.add_trace(go.Scatter(x=df['Date'], y=df['avg'],   name='Risk',  line=dict(color='white')), secondary_y=True)
+fig.add_trace(go.Scatter(x=df_sensex['Date'], y=df_sensex['Value'], name='Price', line=dict(color='gold')))
+fig.add_trace(go.Scatter(x=df_sensex['Date'], y=df_sensex['avg'], name='Risk', line=dict(color='white')), secondary_y=True)
 
 # Add green (`accumulation` or `buy`) rectangles to the figure
 opacity = 0.2
@@ -68,13 +74,13 @@ for i in range(6, 10):
     fig.add_hrect(y0=i*0.1, y1=((i+1)*0.1), line_width=0, fillcolor='red', opacity=opacity, secondary_y=True)
 
 fig.update_xaxes(title='Date')
-fig.update_yaxes(title='Price ($USD)', type='log', showgrid=False)
+fig.update_yaxes(title='Price (Sensex)', type='log', showgrid=False)
 fig.update_yaxes(title='Risk', type='linear', secondary_y=True, showgrid=True, tick0=0.0, dtick=0.1, range=[0, 1])
 fig.update_layout(template='plotly_dark', title={'text': AnnotationText, 'y': 0.9, 'x': 0.5})
 fig.show()
 
 # Plot BTC-USD colored according to Risk values on a logarithmic chart
-fig = px.scatter(df, x='Date', y='Value', color='avg', color_continuous_scale='jet')
+fig = px.scatter(df_sensex, x='Date', y='Value', color='avg', color_continuous_scale='jet')
 fig.update_yaxes(title='Price ($USD)', type='log', showgrid=False)
 fig.update_layout(template='plotly_dark', title={'text': AnnotationText, 'y': 0.9, 'x': 0.5})
 fig.show()
@@ -85,10 +91,9 @@ fig = go.Figure(data=[go.Table(
                 line_color='darkslategray',
                 fill_color='lightskyblue',
                 align='left'),
-    cells=dict(values=[list(price_per_risk.keys()), list(price_per_risk.values())],
+    cells=dict(values=[list(price_per_risk_sensex.keys()), list(price_per_risk_sensex.values())],
                line_color='darkslategray',
                fill_color='lightcyan',
                align='left'))
 ])
-fig.update_layout(width=500, height=500, title={'text': 'Price according to specific risk', 'y': 0.9, 'x': 0.5})
-fig.show()
+fig.update_layout(width=500, height=500, title={'text': 'Price according to specific risk (Sensex)', 'y': 0.9, 'x': 0.5})
